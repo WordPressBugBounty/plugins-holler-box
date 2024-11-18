@@ -30,8 +30,8 @@ if ( ! class_exists( 'Holler_Admin' ) ) {
 		 * Get active instance
 		 *
 		 * @access      public
-		 * @return      self self::$instance The one true Holler_Admin
 		 * @since       0.2.0
+		 * @return      self self::$instance The one true Holler_Admin
 		 */
 		public static function instance() {
 			if ( ! self::$instance ) {
@@ -50,14 +50,18 @@ if ( ! class_exists( 'Holler_Admin' ) ) {
 		 * Run action and filter hooks
 		 *
 		 * @access      private
+		 * @since       0.2.0
 		 * @return      void
 		 *
 		 *
-		 * @since       0.2.0
 		 */
 		private function hooks() {
 
-			add_filter( 'replace_editor', [ $this, 'replace_editor' ], 10, 2 );
+            // Thou shall not pass Yoast!
+            $this->disable_yoast_seo_on_edit_screen();
+
+			add_filter( 'replace_editor', [ $this, 'replace_editor' ], 99, 2 );
+
 			add_action( 'admin_action_hollerbox_export', [ $this, 'export_popup' ] );
 			add_action( 'admin_action_hollerbox_duplicate', [ $this, 'duplicate_popup' ] );
 
@@ -163,20 +167,20 @@ if ( ! class_exists( 'Holler_Admin' ) ) {
 			}, $converted );
 
 			?>
-			<h2><?php _e( 'HollerBox' ) ?></h2>
-			<table class="form-table">
-				<tr>
-					<th><?php _e( 'Closed popups', 'holler-box' ); ?></th>
-					<td><?php echo implode( ', ', $closed ) ?></td>
-				</tr>
-				<tr>
-					<th><?php _e( 'Converted popups', 'holler-box' ); ?></th>
-					<td><?php echo implode( ', ', $converted ) ?></td>
-				</tr>
-			</table>
-			<p>
-				<a href="<?php echo esc_url( wp_nonce_url( $_SERVER['REQUEST_URI'], self::CLEAR_CACHE_NONCE, 'holler_clear_cache_single_user' ) ) ?>"
-				   class="button button-secondary"><?php _e( 'Clear user cache' ); ?></a></p>
+            <h2><?php _e( 'HollerBox' ) ?></h2>
+            <table class="form-table">
+                <tr>
+                    <th><?php _e( 'Closed popups', 'holler-box' ); ?></th>
+                    <td><?php echo implode( ', ', $closed ) ?></td>
+                </tr>
+                <tr>
+                    <th><?php _e( 'Converted popups', 'holler-box' ); ?></th>
+                    <td><?php echo implode( ', ', $converted ) ?></td>
+                </tr>
+            </table>
+            <p>
+                <a href="<?php echo esc_url( wp_nonce_url( $_SERVER['REQUEST_URI'], self::CLEAR_CACHE_NONCE, 'holler_clear_cache_single_user' ) ) ?>"
+                   class="button button-secondary"><?php _e( 'Clear user cache' ); ?></a></p>
 			<?php
 
 
@@ -298,7 +302,7 @@ if ( ! class_exists( 'Holler_Admin' ) ) {
 		 */
 		public function settings_page() {
 			?>
-			<div id="holler-app"></div><?php
+            <div id="holler-app"></div><?php
 		}
 
 		/**
@@ -309,7 +313,7 @@ if ( ! class_exists( 'Holler_Admin' ) ) {
 		public function reports_page() {
 
 			?>
-			<div id="holler-app"></div><?php
+            <div id="holler-app"></div><?php
 		}
 
 		/**
@@ -325,7 +329,7 @@ if ( ! class_exists( 'Holler_Admin' ) ) {
 
 			$groundhogg_installed = defined( 'GROUNDHOGG_VERSION' );
 
-			if ( $groundhogg_installed && function_exists( 'Groundhogg\enqueue_filter_assets' ) ){
+			if ( $groundhogg_installed && function_exists( 'Groundhogg\enqueue_filter_assets' ) ) {
 				\Groundhogg\enqueue_filter_assets();
 			}
 
@@ -432,35 +436,37 @@ if ( ! class_exists( 'Holler_Admin' ) ) {
 			}
 
 			if ( did_action( 'load-post-new.php' ) || did_action( 'load-post.php' ) ) {
-				$this->render_builder();
+				$this->maybe_render_builder();
 			}
 
 			return true;
 		}
 
 		/**
-		 * Load the editor on the post-new.php page
+         * Yoast is being bad, so lets fix that.
+         *
+		 * @return void
 		 */
-		public function post_new() {
-			$screen = get_current_screen();
+        public function disable_yoast_seo_on_edit_screen() {
 
-			// Only show on edit/add screen
-			if ( $screen->post_type !== 'hollerbox' ) {
-				return;
-			}
+            if ( ! class_exists( 'WPSEO_Post_Type' ) ){
+                return;
+            }
 
-			$this->render_builder();
-		}
+	        if ( WPSEO_Post_Type::has_metabox_enabled( 'hollerbox' ) ){
+		        WPSEO_Options::set( 'display-metabox-pt-hollerbox', false );
+	        }
+        }
 
 		/**
-		 * Load the editor on the post.php page
+		 * Ensure we only output the stuff we need once.
+		 *
+		 * @return void
 		 */
-		public function post() {
+		public function maybe_render_builder() {
 
-			$screen = get_current_screen();
-
-			// Only show on edit/add screen
-			if ( $screen->post_type !== 'hollerbox' || $_GET['action'] !== 'edit' ) {
+			// only output once
+			if ( has_action( 'in_admin_footer', [ $this, 'builder_scripts' ] ) ) {
 				return;
 			}
 
@@ -482,7 +488,8 @@ if ( ! class_exists( 'Holler_Admin' ) ) {
 			require_once ABSPATH . 'wp-admin/admin-header.php';
 
 			?>
-			<div id="holler-app"></div><?php
+            <div id="holler-app"></div>
+			<?php
 		}
 
 		/**
